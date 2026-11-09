@@ -94,6 +94,3 @@ Beberapa pengembangan yang berpotensi ditambahkan:
 ---
 
 **Bengkel Track**  
-*Digitalisasi Administrasi Peminjaman dan Pengembalian Alat Bengkel.*
-
-Developed with Python 🐍
