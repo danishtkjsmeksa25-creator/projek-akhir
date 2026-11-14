@@ -64,7 +64,7 @@ class BengkelTrackApp:
                     FOREIGN KEY (peminjaman_id) REFERENCES peminjaman(id)
                 )
             """)
-
+            
     #  Layout!
     def setup_style(self):
         style = ttk.Style()
@@ -181,4 +181,38 @@ class BengkelTrackApp:
         tree.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
         return tree
+
+    # Dashboard!
+    def build_dashboard(self):
+        page = self.pages["Dashboard"]
+        self.page_title(page, "Dashboard", "Ringkasan aktivitas peminjaman alat bengkel.")
+
+        cards = tk.Frame(page, bg=BG)
+        cards.pack(fill="x")
+        self.stat_labels = {}
+        stats = [
+            ("Dipinjam", "0", RED),
+            ("Sudah kembali", "0", GREEN),
+            ("Alat rusak", "0", YELLOW),
+            ("Total transaksi", "0", WHITE),
+        ]
+        for label, value, color in stats:
+            card = tk.Frame(cards, bg=PANEL, padx=18, pady=16)
+            card.pack(side="left", fill="both", expand=True, padx=(0, 10))
+            tk.Label(card, text=label.upper(), bg=PANEL, fg=MUTED,
+                     font=("Segoe UI", 9, "bold")).pack(anchor="w")
+            number = tk.Label(card, text=value, bg=PANEL, fg=color,
+                              font=("Segoe UI", 25, "bold"))
+            number.pack(anchor="w", pady=(7, 0))
+            self.stat_labels[label] = number
+
+        tk.Label(
+            page, text="PEMINJAMAN TERBARU", bg=BG, fg=WHITE,
+            font=("Segoe UI", 12, "bold")
+        ).pack(anchor="w", pady=(25, 6))
+        self.dashboard_tree = self.make_tree(
+            page, ("id", "nama", "kelas", "waktu", "alat", "status"),
+            ("ID", "Nama Peminjam", "Kelas", "Jam Peminjaman", "Daftar Alat", "Status"),
+            (50, 170, 100, 170, 300, 110)
+        )
 
