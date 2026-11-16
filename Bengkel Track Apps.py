@@ -216,3 +216,74 @@ class BengkelTrackApp:
             (50, 170, 100, 170, 300, 110)
         )
 
+    # Formulir Peminjaman!
+    def build_peminjaman(self):
+        page = self.pages["Peminjaman"]
+        self.page_title(page, "Peminjaman Alat", "Isi data peminjam dan alat yang dibawa.")
+
+        form = tk.Frame(page, bg=PANEL, padx=20, pady=16)
+        form.pack(fill="x")
+        self.nama_var = tk.StringVar()
+        self.kelas_var = tk.StringVar()
+        self.alat_var = tk.StringVar()
+        self.jumlah_var = tk.StringVar(value="1")
+
+        self.make_label(form, "Nama peminjam")
+        self.make_entry(form, self.nama_var, 45).pack(anchor="w", ipady=7)
+        self.make_label(form, "Kelas")
+        self.make_entry(form, self.kelas_var, 25).pack(anchor="w", ipady=7)
+
+        row = tk.Frame(form, bg=PANEL)
+        row.pack(fill="x", pady=(0, 5))
+        left = tk.Frame(row, bg=PANEL)
+        left.pack(side="left", fill="x", expand=True, padx=(0, 12))
+        right = tk.Frame(row, bg=PANEL)
+        right.pack(side="left")
+        self.make_label(left, "Nama alat")
+        self.make_entry(left, self.alat_var, 40).pack(anchor="w", ipady=7)
+        self.make_label(right, "Jumlah")
+        self.make_entry(right, self.jumlah_var, 10).pack(anchor="w", ipady=7)
+
+        self.make_button(form, "＋  Simpan Peminjaman", self.save_peminjaman).pack(
+            anchor="w", pady=(14, 0)
+        )
+
+        tk.Label(page, text="DAFTAR PEMINJAMAN AKTIF", bg=BG, fg=WHITE,
+                 font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(18, 0))
+        self.loan_tree = self.make_tree(
+            page, ("id", "nama", "kelas", "waktu", "alat", "total"),
+            ("ID", "Nama", "Kelas", "Jam Pinjam", "Daftar Alat", "Total Alat"),
+            (50, 160, 100, 165, 350, 90)
+        )
+
+    def save_peminjaman(self):
+        nama = self.nama_var.get().strip()
+        kelas = self.kelas_var.get().strip()
+        alat = self.alat_var.get().strip()
+        jumlah_text = self.jumlah_var.get().strip()
+
+        if not nama or not kelas or not alat or not jumlah_text:
+            messagebox.showwarning("Data belum lengkap", "Isi nama, kelas, nama alat, dan jumlah.")
+            return
+        try:
+            jumlah = int(jumlah_text)
+            if jumlah < 1:
+                raise ValueError
+        except ValueError:
+            messagebox.showwarning("Jumlah tidak valid", "Jumlah alat harus berupa angka minimal 1.")
+            return
+
+        waktu = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        with self.db:
+            self.db.execute("""
+                INSERT INTO peminjaman (nama, kelas, waktu_pinjam, daftar_alat, total_alat, status)
+                VALUES (?, ?, ?, ?, ?, 'Dipinjam')
+            """, (nama, kelas, waktu, f"{alat} (jumlah {jumlah})", jumlah))
+
+        self.nama_var.set("")
+        self.kelas_var.set("")
+        self.alat_var.set("")
+        self.jumlah_var.set("1")
+        messagebox.showinfo("Berhasil", "Data peminjaman berhasil disimpan.")
+        self.refresh_all()
+
