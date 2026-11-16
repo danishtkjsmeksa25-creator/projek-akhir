@@ -286,4 +286,3 @@ class BengkelTrackApp:
         self.jumlah_var.set("1")
         messagebox.showinfo("Berhasil", "Data peminjaman berhasil disimpan.")
         self.refresh_all()
-
