@@ -286,3 +286,113 @@ class BengkelTrackApp:
         self.jumlah_var.set("1")
         messagebox.showinfo("Berhasil", "Data peminjaman berhasil disimpan.")
         self.refresh_all()
+
+    # Formulir Pengembalian!
+    def build_pengembalian(self):
+        page = self.pages["Pengembalian"]
+        self.page_title(page, "Pengembalian Alat", "Pilih transaksi aktif, lalu catat kondisi alat.")
+
+        form = tk.Frame(page, bg=PANEL, padx=20, pady=16)
+        form.pack(fill="x")
+        self.loan_choice = tk.StringVar()
+        self.return_person_var = tk.StringVar()
+        self.return_total_var = tk.StringVar()
+        self.damage_var = tk.StringVar(value="Tidak")
+        self.damage_note_var = tk.StringVar()
+
+        self.make_label(form, "Pilih peminjaman yang akan dikembalikan")
+        self.loan_combo = ttk.Combobox(
+            form, textvariable=self.loan_choice, state="readonly", width=75
+        )
+        self.loan_combo.pack(anchor="w", ipady=5, fill="x")
+
+        self.make_label(form, "Nama penanggung jawab alat")
+        self.make_entry(form, self.return_person_var, 45).pack(anchor="w", ipady=7)
+
+        self.make_label(form, "Total alat yang dikembalikan")
+        self.make_entry(form, self.return_total_var, 15).pack(anchor="w", ipady=7)
+
+        self.make_label(form, "Apakah ada kerusakan?")
+        ttk.Combobox(
+            form, textvariable=self.damage_var, values=("Tidak", "Ya"),
+            state="readonly", width=12
+        ).pack(anchor="w", ipady=4)
+
+        self.make_label(form, "Keterangan kerusakan (isi jika ada)")
+        self.make_entry(form, self.damage_note_var, 60).pack(anchor="w", ipady=7)
+
+        self.make_button(form, "✓  Simpan Pengembalian", self.save_pengembalian).pack(
+            anchor="w", pady=(14, 0)
+        )
+
+        tk.Label(page, text="RIWAYAT PENGEMBALIAN", bg=BG, fg=WHITE,
+                 font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(18, 0))
+        self.return_tree = self.make_tree(
+            page, ("waktu", "person", "total", "damage", "note"),
+            ("Waktu Kembali", "Penanggung Jawab", "Total Alat", "Kerusakan", "Keterangan"),
+            (170, 200, 100, 110, 350)
+        )
+
+    def save_pengembalian(self):
+        choice = self.loan_choice.get()
+        person = self.return_person_var.get().strip()
+        total_text = self.return_total_var.get().strip()
+        damage = self.damage_var.get()
+        note = self.damage_note_var.get().strip()
+
+        if not choice or not person or not total_text:
+            messagebox.showwarning(
+                "Data belum lengkap",
+                "Pilih peminjaman, isi nama penanggung jawab, dan total alat."
+            )
+            return
+        try:
+            total = int(total_text)
+            if total < 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showwarning("Jumlah tidak valid", "Total alat harus angka 0 atau lebih.")
+            return
+        if damage == "Ya" and not note:
+            messagebox.showwarning("Keterangan diperlukan", "Tuliskan keterangan kerusakan alat.")
+            return
+
+        try:
+            loan_id = int(choice.split(" | ")[0].replace("ID ", ""))
+        except (ValueError, IndexError):
+            messagebox.showerror("Kesalahan", "Pilihan peminjaman tidak terbaca. Pilih ulang.")
+            return
+
+        loan = self.db.execute(
+            "SELECT * FROM peminjaman WHERE id = ? AND status = 'Dipinjam'", (loan_id,)
+        ).fetchone()
+        if loan is None:
+            messagebox.showwarning("Transaksi tidak tersedia", "Peminjaman ini sudah dikembalikan.")
+            self.refresh_all()
+            return
+        if total > loan["total_alat"]:
+            messagebox.showwarning(
+                "Jumlah tidak sesuai",
+                f"Total yang dikembalikan ({total}) tidak boleh melebihi jumlah pinjaman "
+                f"({loan['total_alat']})."
+            )
+            return
+
+        waktu = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+        with self.db:
+            self.db.execute("""
+                INSERT INTO pengembalian
+                (peminjaman_id, penanggung_jawab, total_alat, ada_kerusakan, keterangan, waktu_kembali)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (loan_id, person, total, damage, note, waktu))
+            self.db.execute(
+                "UPDATE peminjaman SET status = 'Dikembalikan' WHERE id = ?", (loan_id,)
+            )
+
+        self.return_person_var.set("")
+        self.return_total_var.set("")
+        self.damage_var.set("Tidak")
+        self.damage_note_var.set("")
+        messagebox.showinfo("Berhasil", "Data pengembalian berhasil disimpan.")
+        self.refresh_all()
+        
