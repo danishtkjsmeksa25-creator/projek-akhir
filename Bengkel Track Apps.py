@@ -64,7 +64,7 @@ class BengkelTrackApp:
                     FOREIGN KEY (peminjaman_id) REFERENCES peminjaman(id)
                 )
             """)
-            
+
     #  Layout!
     def setup_style(self):
         style = ttk.Style()
@@ -395,4 +395,150 @@ class BengkelTrackApp:
         self.damage_note_var.set("")
         messagebox.showinfo("Berhasil", "Data pengembalian berhasil disimpan.")
         self.refresh_all()
-        
+
+    # Riwayat Peminjaman!
+    def build_riwayat(self):
+        page = self.pages["Riwayat"]
+        self.page_title(page, "Riwayat Transaksi", "Semua transaksi tersimpan di database lokal.")
+        actions = tk.Frame(page, bg=BG)
+        actions.pack(fill="x")
+        self.make_button(actions, "Ekspor Peminjaman CSV", self.export_peminjaman).pack(
+            side="left", padx=(0, 8)
+        )
+        self.make_button(actions, "Ekspor Pengembalian CSV", self.export_pengembalian,
+                         color=RED_DARK).pack(side="left")
+        tk.Label(page, text="DATA PEMINJAMAN", bg=BG, fg=WHITE,
+                 font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(18, 0))
+        self.history_loan_tree = self.make_tree(
+            page, ("id", "nama", "kelas", "waktu", "alat", "total", "status"),
+            ("ID", "Nama", "Kelas", "Waktu Pinjam", "Daftar Alat", "Total", "Status"),
+            (45, 130, 90, 150, 270, 65, 110)
+        )
+
+    def export_peminjaman(self):
+        rows = self.db.execute("SELECT * FROM peminjaman ORDER BY id DESC").fetchall()
+        if not rows:
+            messagebox.showinfo("Belum ada data", "Belum ada data peminjaman untuk diekspor.")
+            return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".csv", filetypes=[("CSV", "*.csv")],
+            initialfile="laporan_peminjaman.csv"
+        )
+        if not path:
+            return
+        with open(path, "w", newline="", encoding="utf-8-sig") as file:
+            writer = csv.writer(file)
+            writer.writerow(["ID", "Nama", "Kelas", "Waktu Pinjam", "Daftar Alat", "Total Alat", "Status"])
+            for row in rows:
+                writer.writerow([row["id"], row["nama"], row["kelas"], row["waktu_pinjam"],
+                                 row["daftar_alat"], row["total_alat"], row["status"]])
+        messagebox.showinfo("Ekspor berhasil", f"Laporan disimpan di:\n{path}")
+
+    def export_pengembalian(self):
+        rows = self.db.execute("""
+            SELECT p.id, r.penanggung_jawab, r.total_alat, r.ada_kerusakan,
+                   r.keterangan, r.waktu_kembali
+            FROM pengembalian r JOIN peminjaman p ON p.id = r.peminjaman_id
+            ORDER BY r.id DESC
+        """).fetchall()
+        if not rows:
+            messagebox.showinfo("Belum ada data", "Belum ada data pengembalian untuk diekspor.")
+            return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".csv", filetypes=[("CSV", "*.csv")],
+            initialfile="laporan_pengembalian.csv"
+        )
+        if not path:
+            return
+        with open(path, "w", newline="", encoding="utf-8-sig") as file:
+            writer = csv.writer(file)
+            writer.writerow(["ID Peminjaman", "Penanggung Jawab", "Total Alat",
+                             "Ada Kerusakan", "Keterangan", "Waktu Kembali"])
+            for row in rows:
+                writer.writerow([row["id"], row["penanggung_jawab"], row["total_alat"],
+                                 row["ada_kerusakan"], row["keterangan"], row["waktu_kembali"]])
+        messagebox.showinfo("Ekspor berhasil", f"Laporan disimpan di:\n{path}")
+
+    # Fungsi Refresh Status Peminjaman!
+    def clear_tree(self, tree):
+        for item in tree.get_children():
+            tree.delete(item)
+
+    def refresh_all(self):
+        if not hasattr(self, "dashboard_tree"):
+            return
+
+        active = self.db.execute(
+            "SELECT COUNT(*) AS n FROM peminjaman WHERE status='Dipinjam'"
+        ).fetchone()["n"]
+        returned = self.db.execute(
+            "SELECT COUNT(*) AS n FROM pengembalian"
+        ).fetchone()["n"]
+        damaged = self.db.execute(
+            "SELECT COUNT(*) AS n FROM pengembalian WHERE ada_kerusakan='Ya'"
+        ).fetchone()["n"]
+        total = self.db.execute(
+            "SELECT COUNT(*) AS n FROM peminjaman"
+        ).fetchone()["n"]
+
+        self.stat_labels["Dipinjam"].configure(text=str(active))
+        self.stat_labels["Sudah kembali"].configure(text=str(returned))
+        self.stat_labels["Alat rusak"].configure(text=str(damaged))
+        self.stat_labels["Total transaksi"].configure(text=str(total))
+
+        recent = self.db.execute("SELECT * FROM peminjaman ORDER BY id DESC LIMIT 12").fetchall()
+        self.clear_tree(self.dashboard_tree)
+        for row in recent:
+            self.dashboard_tree.insert("", "end", values=(
+                row["id"], row["nama"], row["kelas"], row["waktu_pinjam"],
+                row["daftar_alat"], row["status"]
+            ))
+
+        active_rows = self.db.execute(
+            "SELECT * FROM peminjaman WHERE status='Dipinjam' ORDER BY id DESC"
+        ).fetchall()
+        self.clear_tree(self.loan_tree)
+        combo_values = []
+        for row in active_rows:
+            self.loan_tree.insert("", "end", values=(
+                row["id"], row["nama"], row["kelas"], row["waktu_pinjam"],
+                row["daftar_alat"], row["total_alat"]
+            ))
+            combo_values.append(
+                f"ID {row['id']} | {row['nama']} | {row['kelas']} | {row['daftar_alat']}"
+            )
+        self.loan_combo["values"] = combo_values
+        if self.loan_choice.get() not in combo_values:
+            self.loan_choice.set(combo_values[0] if combo_values else "")
+
+        returned_rows = self.db.execute("""
+            SELECT * FROM pengembalian ORDER BY id DESC
+        """).fetchall()
+        self.clear_tree(self.return_tree)
+        for row in returned_rows:
+            self.return_tree.insert("", "end", values=(
+                row["waktu_kembali"], row["penanggung_jawab"], row["total_alat"],
+                row["ada_kerusakan"], row["keterangan"] or "-"
+            ))
+
+        all_rows = self.db.execute("SELECT * FROM peminjaman ORDER BY id DESC").fetchall()
+        self.clear_tree(self.history_loan_tree)
+        for row in all_rows:
+            self.history_loan_tree.insert("", "end", values=(
+                row["id"], row["nama"], row["kelas"], row["waktu_pinjam"],
+                row["daftar_alat"], row["total_alat"], row["status"]
+            ))
+
+    def close_app(self):
+        self.db.close()
+        self.root.destroy()
+
+
+def main():
+    root = tk.Tk()
+    app = BengkelTrackApp(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
