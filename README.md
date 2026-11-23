@@ -52,36 +52,6 @@ Lokasi penyimpanan permanen berada di %LOCALAPPDATA%\BengkelTrack.
 
 Data tetap tersimpan meskipun aplikasi diperbarui atau dijalankan ulang, selama database tidak dihapus.
 
-🛠️ Teknologi yang Digunakan
-
-Teknologi
-
-Kegunaan
-
-Python
-
-Bahasa pemrograman
-
-Tkinter
-
-Antarmuka desktop
-
-SQLite
-
-Penyimpanan database
-
-CSV
-
-Ekspor data
-
-Datetime
-
-Pengelolaan waktu transaksi
-
-Pillow
-
-Pemrosesan gambar dan logo
-
 🎨 Tampilan Antarmuka
 
 Menggunakan kombinasi warna merah, hitam, dan putih dengan desain modern dan sederhana. Aplikasi juga dilengkapi logo untuk memperkuat identitas tampilan.
