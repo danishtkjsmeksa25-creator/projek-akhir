@@ -1,4 +1,5 @@
 🔧 Bengkel Track – Aplikasi Peminjaman Alat Bengkel
+(exe ada di release pojok kanan)
 
 📌 Deskripsi Proyek
 
