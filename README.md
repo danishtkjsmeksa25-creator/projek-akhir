@@ -1,96 +1,107 @@
-# 🔧 Bengkel Track – Aplikasi Peminjaman Alat Bengkel
+🔧 Bengkel Track – Aplikasi Peminjaman Alat Bengkel
 
-## 📌 Deskripsi Proyek
+📌 Deskripsi Proyek
 
-**Bengkel Track** merupakan aplikasi desktop berbasis Python yang dirancang untuk membantu proses pengelolaan administrasi peminjaman dan pengembalian peralatan bengkel.
+Bengkel Track merupakan aplikasi desktop berbasis Python untuk membantu pengelolaan administrasi peminjaman dan pengembalian alat bengkel secara digital. Aplikasi ini dirancang untuk menggantikan pencatatan manual agar data transaksi lebih terstruktur, mudah dikelola, dan dipantau.
 
-Aplikasi ini dibuat sebagai solusi digital untuk menggantikan proses pencatatan manual yang berpotensi menyebabkan kesalahan pencatatan, kehilangan data, maupun kesulitan dalam memantau status peminjaman alat.
+🎯 Fitur Utama
 
-Dengan aplikasi ini, pengguna dapat mencatat data peminjam, mengelola transaksi pengembalian, memantau kondisi peralatan, serta menyimpan riwayat transaksi secara terstruktur melalui database lokal.
+1. Dashboard
 
-## 🎯 Tujuan Pembuatan
+Menampilkan ringkasan transaksi peminjaman dan pengembalian.
 
-Tujuan utama pengembangan aplikasi Bengkel Track adalah:
+Menampilkan jumlah laporan kerusakan.
 
-- Mempermudah proses pencatatan peminjaman dan pengembalian alat bengkel.
-- Mengurangi ketergantungan terhadap pencatatan manual menggunakan kertas.
-- Membantu memantau status peralatan yang sedang dipinjam maupun sudah dikembalikan.
-- Mempermudah dokumentasi kondisi alat ketika proses pengembalian.
-- Menyediakan penyimpanan data yang terstruktur dan mudah diakses.
-- Menerapkan ilmu pemrograman Python dan pengelolaan database ke dalam proyek nyata.
+Menampilkan daftar peminjaman terbaru.
 
-## ⚙️ Fitur Utama
+2. Manajemen Peminjaman
 
-### 1. Dashboard
-Menampilkan ringkasan aktivitas transaksi, meliputi:
-- Jumlah transaksi peminjaman aktif.
-- Jumlah transaksi yang sudah dikembalikan.
-- Jumlah transaksi dengan laporan kerusakan.
-- Total keseluruhan transaksi.
-- Daftar peminjaman terbaru.
+Mencatat nama dan kelas peminjam.
 
-### 2. Manajemen Peminjaman
-Digunakan untuk mencatat transaksi peminjaman peralatan bengkel dengan informasi:
-- Nama peminjam.
-- Kelas peminjam.
-- Nama peralatan.
-- Jumlah peralatan.
-- Tanggal dan waktu peminjaman otomatis.
+Mencatat nama serta jumlah alat.
 
-### 3. Manajemen Pengembalian
-Digunakan untuk mencatat proses pengembalian peralatan dengan informasi:
-- Data transaksi peminjaman yang akan dikembalikan.
-- Nama penanggung jawab alat.
-- Jumlah alat yang dikembalikan.
-- Status kondisi alat (rusak atau tidak).
-- Keterangan kerusakan.
-- Tanggal dan waktu pengembalian otomatis.
+Menyimpan tanggal dan waktu peminjaman otomatis.
 
-Setelah transaksi pengembalian berhasil disimpan, status peminjaman akan diperbarui secara otomatis.
+3. Manajemen Pengembalian
 
-### 4. Riwayat Transaksi
-Menyediakan dokumentasi seluruh transaksi peminjaman dan pengembalian yang telah dilakukan.
+Memilih transaksi peminjaman yang akan dikembalikan.
 
-Tersedia fitur ekspor data ke format CSV untuk mempermudah pembuatan laporan dan pengolahan data menggunakan aplikasi spreadsheet.
+Mencatat penanggung jawab dan jumlah alat.
 
-## 🛠️ Teknologi yang Digunakan
+Mencatat kondisi alat serta keterangan kerusakan.
 
-| Teknologi | Kegunaan |
-|---|---|
-| Python | Bahasa pemrograman utama |
-| Tkinter | Membangun antarmuka aplikasi desktop |
-| SQLite | Database penyimpanan data lokal |
-| CSV | Ekspor laporan transaksi |
-| Datetime | Mengelola tanggal dan waktu transaksi |
+Memperbarui status peminjaman secara otomatis.
 
-## 💾 Sistem Penyimpanan Data
+4. Riwayat Transaksi
 
-Aplikasi menggunakan SQLite sebagai sistem database lokal. Seluruh informasi peminjaman dan pengembalian disimpan dalam file `bengkel_track.db`.
+Menampilkan riwayat peminjaman.
 
-Database terdiri dari dua tabel utama:
-- `peminjaman` – Menyimpan informasi identitas peminjam, alat, jumlah, waktu, dan status peminjaman.
-- `pengembalian` – Menyimpan informasi pengembalian, penanggung jawab, jumlah alat, kondisi kerusakan, dan waktu pengembalian.
+Mengekspor data peminjaman dan pengembalian ke format CSV.
 
-Penyimpanan lokal memungkinkan aplikasi digunakan tanpa memerlukan koneksi internet maupun server database terpisah.
+Menghapus transaksi yang salah dicatat.
 
-## 🎨 Tampilan Antarmuka
+Memilih dan menghapus beberapa transaksi sekaligus.
 
-Aplikasi menggunakan kombinasi warna merah, hitam, dan putih dengan konsep tampilan modern dan sederhana. Antarmuka dibangun menggunakan Tkinter agar pengguna dapat mengoperasikan aplikasi melalui tampilan grafis tanpa harus berinteraksi langsung dengan terminal.
+5. Sistem Penyimpanan Database
 
-## 🚀 Manfaat Aplikasi
+Menggunakan SQLite untuk menyimpan data secara lokal.
 
-Dengan adanya Bengkel Track, proses administrasi peralatan bengkel diharapkan menjadi lebih terstruktur, efisien, dan mudah dipantau. Aplikasi ini juga membantu penanggung jawab dalam melakukan dokumentasi transaksi serta mengetahui kondisi peralatan setelah digunakan.
+Database disimpan dalam file bengkel_track.db.
 
-## 🔮 Pengembangan Selanjutnya
+Lokasi penyimpanan permanen berada di %LOCALAPPDATA%\BengkelTrack.
 
-Beberapa pengembangan yang berpotensi ditambahkan:
-- Sistem autentikasi dan login pengguna.
-- Manajemen inventaris dan stok peralatan.
-- Fitur pencarian dan filter transaksi.
-- Pencetakan bukti peminjaman dan pengembalian.
-- Backup dan pemulihan database.
-- Pengembangan sistem ke jaringan lokal atau cloud.
+Data tetap tersimpan meskipun aplikasi diperbarui atau dijalankan ulang, selama database tidak dihapus.
 
----
+🛠️ Teknologi yang Digunakan
 
-**Bengkel Track**  
+Teknologi
+
+Kegunaan
+
+Python
+
+Bahasa pemrograman
+
+Tkinter
+
+Antarmuka desktop
+
+SQLite
+
+Penyimpanan database
+
+CSV
+
+Ekspor data
+
+Datetime
+
+Pengelolaan waktu transaksi
+
+Pillow
+
+Pemrosesan gambar dan logo
+
+🎨 Tampilan Antarmuka
+
+Menggunakan kombinasi warna merah, hitam, dan putih dengan desain modern dan sederhana. Aplikasi juga dilengkapi logo untuk memperkuat identitas tampilan.
+
+🚀 Tujuan dan Manfaat
+
+Bengkel Track dikembangkan untuk mempermudah pencatatan transaksi, mengurangi kesalahan administrasi, memantau status peminjaman, serta mendokumentasikan kondisi peralatan bengkel.
+
+🔮 Pengembangan Selanjutnya
+
+Sistem login pengguna.
+
+Manajemen inventaris dan stok alat.
+
+Pencarian dan filter transaksi.
+
+Pencetakan bukti transaksi.
+
+Backup dan pemulihan database.
+
+Pengembangan ke jaringan lokal atau cloud.
+
+Bengkel Track – Digitalisasi Administrasi Peminjaman Alat Bengkel.
