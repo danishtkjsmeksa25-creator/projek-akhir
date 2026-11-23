@@ -4,9 +4,51 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
 from pathlib import Path
+from PIL import Image, ImageTk
+import os
+import sys
+import shutil
 
 APP_TITLE = "List Peminjaman Alat Bengkel"
-DB_FILE = Path(__file__).with_name("bengkel_track.db")
+
+
+def get_database_path():
+    # Lokasi penyimpanan permanen database
+    app_data = Path(os.getenv(
+        "LOCALAPPDATA",
+        str(Path.home() / "AppData" / "Local")
+    ))
+
+    db_folder = app_data / "BengkelTrack"
+    db_folder.mkdir(parents=True, exist_ok=True)
+
+    db_path = db_folder / "bengkel_track.db"
+
+    # Migrasi database lama jika masih tersedia
+    if not db_path.exists():
+        if getattr(sys, "frozen", False):
+            old_path = Path(sys.executable).resolve().parent / "bengkel_track.db"
+        else:
+            old_path = Path(__file__).resolve().parent / "bengkel_track.db"
+
+        if old_path.exists() and old_path.resolve() != db_path.resolve():
+            shutil.copy2(old_path, db_path)
+
+    return db_path
+
+
+DB_FILE = get_database_path()
+
+
+# Fungsi lokasi file gambar untuk Python dan EXE
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+
+    return os.path.join(base_path, relative_path)
+
 
 # Warna Layout!
 BG = "#101114"
@@ -19,17 +61,29 @@ MUTED = "#B5B7C0"
 GREEN = "#37C978"
 YELLOW = "#F4C542"
 
+# Warna Formulir
+FORM_INPUT = "#D1D5DB"
+FORM_TEXT = "#111827"
+
+LOAN_PANEL = "#173B63"
+LOAN_BUTTON = "#2563EB"
+
+RETURN_PANEL = "#164E4A"
+RETURN_BUTTON = "#0F766E"
+
 
 class BengkelTrackApp:
+
     def __init__(self, root):
         self.root = root
-        self.root.title(f"{APP_TITLE} | Manajemen Alat Bengkel")
-        self.root.geometry("1120x720")
-        self.root.minsize(900, 600)
+        self.root.title(APP_TITLE)
+        self.root.geometry("1200x750")
+        self.root.minsize(1000, 650)
         self.root.configure(bg=BG)
 
-        self.db = sqlite3.connect(DB_FILE)
-        self.db.row_factory = sqlite3.Row
+        self.conn = sqlite3.connect(get_database_path())
+        self.conn.row_factory = sqlite3.Row
+
         self.create_tables()
         self.setup_style()
         self.build_layout()
@@ -37,11 +91,12 @@ class BengkelTrackApp:
 
         self.root.protocol("WM_DELETE_WINDOW", self.close_app)
 
-    # Database awal! 
+    # Database awal!
     def create_tables(self):
         """Membuat tabel database jika belum tersedia."""
-        with self.db:
-            self.db.execute("""
+
+        with self.conn:
+            self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS peminjaman (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     nama TEXT NOT NULL,
@@ -52,7 +107,8 @@ class BengkelTrackApp:
                     status TEXT NOT NULL DEFAULT 'Dipinjam'
                 )
             """)
-            self.db.execute("""
+
+            self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS pengembalian (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     peminjaman_id INTEGER NOT NULL UNIQUE,
@@ -65,194 +121,389 @@ class BengkelTrackApp:
                 )
             """)
 
-    #  Layout!
+    # Layout!
     def setup_style(self):
         style = ttk.Style()
         style.theme_use("clam")
+
         style.configure(
-            "Treeview", background=PANEL, foreground=WHITE,
-            fieldbackground=PANEL, rowheight=30, borderwidth=0
+            "Treeview",
+            background=PANEL,
+            foreground=WHITE,
+            fieldbackground=PANEL,
+            rowheight=30,
+            borderwidth=0,
+            font=("Segoe UI", 10)
         )
+
         style.configure(
-            "Treeview.Heading", background=RED_DARK,
-            foreground=WHITE, font=("Segoe UI", 10, "bold"), padding=8
+            "Treeview.Heading",
+            background=RED_DARK,
+            foreground=WHITE,
+            font=("Segoe UI", 10, "bold"),
+            padding=8
         )
-        style.map("Treeview", background=[("selected", RED_DARK)])
-        style.configure("TCombobox", fieldbackground=PANEL_2, foreground=WHITE)
+
+        style.map(
+            "Treeview",
+            background=[("selected", RED_DARK)],
+            foreground=[("selected", WHITE)]
+        )
+
+        style.configure(
+            "TCombobox",
+            fieldbackground=FORM_INPUT,
+            background=FORM_INPUT,
+            foreground=FORM_TEXT,
+            font=("Segoe UI", 10)
+        )
+
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", FORM_INPUT)],
+            foreground=[("readonly", FORM_TEXT)],
+            selectbackground=[("readonly", FORM_INPUT)],
+            selectforeground=[("readonly", FORM_TEXT)]
+        )
 
     def build_layout(self):
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=22, pady=(18, 10))
 
-        logo = tk.Label(header,
-            text="TKJ",
-            bg=RED,
-            fg=WHITE,
-            font=("Segoe UI", 18, "bold"),
-            width=4,
-            height=2
-        )
-        logo.pack(side="left", padx=(0, 12))
+        # Logo TKJ
+        try:
+            logo_image = Image.open(resource_path("TKJ.png"))
+            logo_image = logo_image.resize(
+                (80, 80),
+                Image.Resampling.LANCZOS
+            )
 
+            self.logo_photo = ImageTk.PhotoImage(logo_image)
+
+            logo_label = tk.Label(
+                header,
+                image=self.logo_photo,
+                bg=BG
+            )
+            logo_label.pack(side="left", padx=(0, 18))
+
+        except Exception as error:
+            print(f"Gagal memuat logo: {error}")
+
+        # Judul aplikasi
         title_box = tk.Frame(header, bg=BG)
         title_box.pack(side="left", fill="y")
+
         tk.Label(
-            title_box, text=APP_TITLE, bg=BG, fg=WHITE,
+            title_box,
+            text=APP_TITLE,
+            bg=BG,
+            fg=WHITE,
             font=("Segoe UI", 22, "bold")
         ).pack(anchor="w")
+
         tk.Label(
-            title_box, text="List Peminjaman Alat Bengkel",
-            bg=BG, fg=MUTED, font=("Segoe UI", 9)
+            title_box,
+            text="List Peminjaman Alat Bengkel",
+            bg=BG,
+            fg=MUTED,
+            font=("Segoe UI", 9)
         ).pack(anchor="w")
 
+        school_image = Image.open(resource_path("logo_smk.png")).convert("RGBA")
+        school_image = school_image.resize((65, 65), Image.Resampling.LANCZOS)
+        self.school_photo = ImageTk.PhotoImage(school_image)
+
         tk.Label(
-            header, text="SMK NEGERI 1 KOTA KEDIRI", bg=BG, fg=RED,
-            font=("Segoe UI", 10, "bold")
+            header,
+            image=self.school_photo,
+            bg=BG,
+            bd=0
         ).pack(side="right", anchor="center")
 
+        # Navigasi
         self.nav = tk.Frame(self.root, bg=PANEL)
         self.nav.pack(fill="x", padx=22, pady=(0, 12))
 
         container = tk.Frame(self.root, bg=BG)
-        container.pack(fill="both", expand=True, padx=22, pady=(0, 18))
+        container.pack(
+            fill="both",
+            expand=True,
+            padx=22,
+            pady=(0, 18)
+        )
 
         self.pages = {}
+
         for name in ("Dashboard", "Peminjaman", "Pengembalian", "Riwayat"):
             self.pages[name] = tk.Frame(container, bg=BG)
+
             self.make_button(
-                self.nav, name, lambda n=name: self.show_page(n), color=PANEL_2
+                self.nav,
+                name,
+                lambda n=name: self.show_page(n),
+                color=PANEL_2
             ).pack(side="left", padx=(6, 0), pady=6)
 
         self.build_dashboard()
         self.build_peminjaman()
         self.build_pengembalian()
         self.build_riwayat()
+
         self.show_page("Dashboard")
 
     def page_title(self, parent, heading, subtitle):
         tk.Label(
-            parent, text=heading, bg=BG, fg=WHITE,
+            parent,
+            text=heading,
+            bg=BG,
+            fg=WHITE,
             font=("Segoe UI", 19, "bold")
         ).pack(anchor="w", pady=(0, 3))
+
         tk.Label(
-            parent, text=subtitle, bg=BG, fg=MUTED,
+            parent,
+            text=subtitle,
+            bg=BG,
+            fg=MUTED,
             font=("Segoe UI", 10)
         ).pack(anchor="w", pady=(0, 16))
 
     def show_page(self, name):
         for page in self.pages.values():
             page.pack_forget()
+
         self.pages[name].pack(fill="both", expand=True)
         self.refresh_all()
 
     def make_button(self, parent, text, command, color=RED):
         return tk.Button(
-            parent, text=text, command=command, bg=color, fg=WHITE,
-            activebackground=RED_DARK, activeforeground=WHITE,
-            relief="flat", bd=0, padx=15, pady=9,
-            font=("Segoe UI", 10, "bold"), cursor="hand2"
+            parent,
+            text=text,
+            command=command,
+            bg=color,
+            fg=WHITE,
+            activebackground=RED_DARK,
+            activeforeground=WHITE,
+            relief="flat",
+            bd=0,
+            padx=15,
+            pady=9,
+            font=("Segoe UI", 10, "bold"),
+            cursor="hand2"
         )
 
     def make_entry(self, parent, variable=None, width=30):
         entry = tk.Entry(
-            parent, textvariable=variable, width=width,
-            bg=PANEL_2, fg=WHITE, insertbackground=WHITE,
-            relief="flat", font=("Segoe UI", 10)
+            parent,
+            textvariable=variable,
+            width=width,
+            bg=FORM_INPUT,
+            fg=FORM_TEXT,
+            insertbackground=FORM_TEXT,
+            relief="flat",
+            font=("Segoe UI", 10)
         )
-        entry.configure(highlightthickness=1, highlightbackground="#41434B",
-                        highlightcolor=RED)
+
+        entry.configure(
+            highlightthickness=1,
+            highlightbackground="#9CA3AF",
+            highlightcolor="#2563EB"
+        )
+
         return entry
 
     def make_label(self, parent, text):
         tk.Label(
-            parent, text=text, bg=BG, fg=MUTED,
+            parent,
+            text=text,
+            bg=parent.cget("bg"),
+            fg=WHITE,
             font=("Segoe UI", 10, "bold")
         ).pack(anchor="w", pady=(8, 4))
 
-    def make_tree(self, parent, columns, headings, widths):
-        holder = tk.Frame(parent, bg=BG)
-        holder.pack(fill="both", expand=True, pady=(10, 0))
-        tree = ttk.Treeview(holder, columns=columns, show="headings")
+    def make_tree(self, parent, columns, headings, widths, height=8):
+        tree = ttk.Treeview(
+            parent,
+            columns=columns,
+            show="headings",
+            height=height,
+            selectmode="extended"
+        )
+
         for col, heading, width in zip(columns, headings, widths):
             tree.heading(col, text=heading)
-            tree.column(col, width=width, minwidth=70, anchor="w")
-        scroll = ttk.Scrollbar(holder, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=scroll.set)
+            tree.column(col, width=width, anchor="center")
+
+        scrollbar = ttk.Scrollbar(
+            parent,
+            orient="vertical",
+            command=tree.yview
+        )
+
+        tree.configure(yscrollcommand=scrollbar.set)
+
         tree.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
+        scrollbar.pack(side="right", fill="y")
+
         return tree
 
     # Dashboard!
     def build_dashboard(self):
         page = self.pages["Dashboard"]
-        self.page_title(page, "Dashboard", "Ringkasan aktivitas peminjaman alat bengkel.")
+
+        self.page_title(
+            page,
+            "Dashboard",
+            "Ringkasan aktivitas peminjaman alat bengkel."
+        )
 
         cards = tk.Frame(page, bg=BG)
         cards.pack(fill="x")
+
         self.stat_labels = {}
+
         stats = [
             ("Dipinjam", "0", RED),
             ("Sudah kembali", "0", GREEN),
             ("Alat rusak", "0", YELLOW),
             ("Total transaksi", "0", WHITE),
         ]
+
         for label, value, color in stats:
-            card = tk.Frame(cards, bg=PANEL, padx=18, pady=16)
-            card.pack(side="left", fill="both", expand=True, padx=(0, 10))
-            tk.Label(card, text=label.upper(), bg=PANEL, fg=MUTED,
-                     font=("Segoe UI", 9, "bold")).pack(anchor="w")
-            number = tk.Label(card, text=value, bg=PANEL, fg=color,
-                              font=("Segoe UI", 25, "bold"))
+            card = tk.Frame(
+                cards,
+                bg=PANEL,
+                padx=18,
+                pady=16
+            )
+
+            card.pack(
+                side="left",
+                fill="both",
+                expand=True,
+                padx=(0, 10)
+            )
+
+            tk.Label(
+                card,
+                text=label.upper(),
+                bg=PANEL,
+                fg=MUTED,
+                font=("Segoe UI", 9, "bold")
+            ).pack(anchor="w")
+
+            number = tk.Label(
+                card,
+                text=value,
+                bg=PANEL,
+                fg=color,
+                font=("Segoe UI", 25, "bold")
+            )
+
             number.pack(anchor="w", pady=(7, 0))
             self.stat_labels[label] = number
 
         tk.Label(
-            page, text="PEMINJAMAN TERBARU", bg=BG, fg=WHITE,
+            page,
+            text="PEMINJAMAN TERBARU",
+            bg=BG,
+            fg=WHITE,
             font=("Segoe UI", 12, "bold")
         ).pack(anchor="w", pady=(25, 6))
+
         self.dashboard_tree = self.make_tree(
-            page, ("id", "nama", "kelas", "waktu", "alat", "status"),
-            ("ID", "Nama Peminjam", "Kelas", "Jam Peminjaman", "Daftar Alat", "Status"),
+            page,
+            ("id", "nama", "kelas", "waktu", "alat", "status"),
+            (
+                "ID",
+                "Nama Peminjam",
+                "Kelas",
+                "Jam Peminjaman",
+                "Daftar Alat",
+                "Status"
+            ),
             (50, 170, 100, 170, 300, 110)
         )
 
     # Formulir Peminjaman!
     def build_peminjaman(self):
         page = self.pages["Peminjaman"]
-        self.page_title(page, "Peminjaman Alat", "Isi data peminjam dan alat yang dibawa.")
 
-        form = tk.Frame(page, bg=PANEL, padx=20, pady=16)
+        self.page_title(
+            page,
+            "Peminjaman Alat",
+            "Isi data peminjam dan alat yang dibawa."
+        )
+
+        form = tk.Frame(
+            page,
+            bg=LOAN_PANEL,
+            padx=20,
+            pady=16
+        )
+
         form.pack(fill="x")
+
         self.nama_var = tk.StringVar()
         self.kelas_var = tk.StringVar()
         self.alat_var = tk.StringVar()
         self.jumlah_var = tk.StringVar(value="1")
 
         self.make_label(form, "Nama peminjam")
-        self.make_entry(form, self.nama_var, 45).pack(anchor="w", ipady=7)
+        self.make_entry(
+            form,
+            self.nama_var,
+            45
+        ).pack(anchor="w", ipady=7)
+
         self.make_label(form, "Kelas")
-        self.make_entry(form, self.kelas_var, 25).pack(anchor="w", ipady=7)
+        self.make_entry(
+            form,
+            self.kelas_var,
+            25
+        ).pack(anchor="w", ipady=7)
 
-        row = tk.Frame(form, bg=PANEL)
-        row.pack(fill="x", pady=(0, 5))
-        left = tk.Frame(row, bg=PANEL)
-        left.pack(side="left", fill="x", expand=True, padx=(0, 12))
-        right = tk.Frame(row, bg=PANEL)
-        right.pack(side="left")
-        self.make_label(left, "Nama alat")
-        self.make_entry(left, self.alat_var, 40).pack(anchor="w", ipady=7)
-        self.make_label(right, "Jumlah")
-        self.make_entry(right, self.jumlah_var, 10).pack(anchor="w", ipady=7)
+        self.make_label(form, "Nama alat")
+        self.make_entry(
+            form,
+            self.alat_var,
+            40
+        ).pack(anchor="w", ipady=7)
 
-        self.make_button(form, "＋  Simpan Peminjaman", self.save_peminjaman).pack(
-            anchor="w", pady=(14, 0)
-        )
+        self.make_label(form, "Jumlah")
+        self.make_entry(
+            form,
+            self.jumlah_var,
+            10
+        ).pack(anchor="w", ipady=7)
 
-        tk.Label(page, text="DAFTAR PEMINJAMAN AKTIF", bg=BG, fg=WHITE,
-                 font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(18, 0))
+        self.make_button(
+            form,
+            "＋  Simpan Peminjaman",
+            self.save_peminjaman,
+            color=LOAN_BUTTON
+        ).pack(anchor="w", pady=(14, 0))
+
+        tk.Label(
+            page,
+            text="DAFTAR PEMINJAMAN AKTIF",
+            bg=BG,
+            fg=WHITE,
+            font=("Segoe UI", 12, "bold")
+        ).pack(anchor="w", pady=(18, 0))
+
         self.loan_tree = self.make_tree(
-            page, ("id", "nama", "kelas", "waktu", "alat", "total"),
-            ("ID", "Nama", "Kelas", "Jam Pinjam", "Daftar Alat", "Total Alat"),
+            page,
+            ("id", "nama", "kelas", "waktu", "alat", "total"),
+            (
+                "ID",
+                "Nama",
+                "Kelas",
+                "Jam Pinjam",
+                "Daftar Alat",
+                "Total Alat"
+            ),
             (50, 160, 100, 165, 350, 90)
         )
 
@@ -263,73 +514,166 @@ class BengkelTrackApp:
         jumlah_text = self.jumlah_var.get().strip()
 
         if not nama or not kelas or not alat or not jumlah_text:
-            messagebox.showwarning("Data belum lengkap", "Isi nama, kelas, nama alat, dan jumlah.")
+            messagebox.showwarning(
+                "Data belum lengkap",
+                "Isi nama, kelas, nama alat, dan jumlah."
+            )
             return
+
         try:
             jumlah = int(jumlah_text)
+
             if jumlah < 1:
                 raise ValueError
+
         except ValueError:
-            messagebox.showwarning("Jumlah tidak valid", "Jumlah alat harus berupa angka minimal 1.")
+            messagebox.showwarning(
+                "Jumlah tidak valid",
+                "Jumlah alat harus berupa angka minimal 1."
+            )
             return
 
         waktu = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        with self.db:
-            self.db.execute("""
-                INSERT INTO peminjaman (nama, kelas, waktu_pinjam, daftar_alat, total_alat, status)
+
+        with self.conn:
+            self.conn.execute("""
+                INSERT INTO peminjaman
+                (nama, kelas, waktu_pinjam, daftar_alat, total_alat, status)
                 VALUES (?, ?, ?, ?, ?, 'Dipinjam')
-            """, (nama, kelas, waktu, f"{alat} (jumlah {jumlah})", jumlah))
+            """, (
+                nama,
+                kelas,
+                waktu,
+                f"{alat} (jumlah {jumlah})",
+                jumlah
+            ))
 
         self.nama_var.set("")
         self.kelas_var.set("")
         self.alat_var.set("")
         self.jumlah_var.set("1")
-        messagebox.showinfo("Berhasil", "Data peminjaman berhasil disimpan.")
+
+        messagebox.showinfo(
+            "Berhasil",
+            "Data peminjaman berhasil disimpan."
+        )
+
         self.refresh_all()
 
     # Formulir Pengembalian!
     def build_pengembalian(self):
         page = self.pages["Pengembalian"]
-        self.page_title(page, "Pengembalian Alat", "Pilih transaksi aktif, lalu catat kondisi alat.")
 
-        form = tk.Frame(page, bg=PANEL, padx=20, pady=16)
+        self.page_title(
+            page,
+            "Pengembalian Alat",
+            "Pilih transaksi aktif, lalu catat kondisi alat."
+        )
+
+        form = tk.Frame(
+            page,
+            bg=RETURN_PANEL,
+            padx=20,
+            pady=16
+        )
+
         form.pack(fill="x")
+
         self.loan_choice = tk.StringVar()
         self.return_person_var = tk.StringVar()
         self.return_total_var = tk.StringVar()
         self.damage_var = tk.StringVar(value="Tidak")
         self.damage_note_var = tk.StringVar()
 
-        self.make_label(form, "Pilih peminjaman yang akan dikembalikan")
-        self.loan_combo = ttk.Combobox(
-            form, textvariable=self.loan_choice, state="readonly", width=75
+        self.make_label(
+            form,
+            "Pilih peminjaman yang akan dikembalikan"
         )
-        self.loan_combo.pack(anchor="w", ipady=5, fill="x")
 
-        self.make_label(form, "Nama penanggung jawab alat")
-        self.make_entry(form, self.return_person_var, 45).pack(anchor="w", ipady=7)
+        self.loan_combo = ttk.Combobox(
+            form,
+            textvariable=self.loan_choice,
+            state="readonly",
+            width=75
+        )
 
-        self.make_label(form, "Total alat yang dikembalikan")
-        self.make_entry(form, self.return_total_var, 15).pack(anchor="w", ipady=7)
+        self.loan_combo.pack(
+            anchor="w",
+            ipady=5,
+            fill="x"
+        )
 
-        self.make_label(form, "Apakah ada kerusakan?")
+        self.make_label(
+            form,
+            "Nama penanggung jawab alat"
+        )
+
+        self.make_entry(
+            form,
+            self.return_person_var,
+            45
+        ).pack(anchor="w", ipady=7)
+
+        self.make_label(
+            form,
+            "Total alat yang dikembalikan"
+        )
+
+        self.make_entry(
+            form,
+            self.return_total_var,
+            15
+        ).pack(anchor="w", ipady=7)
+
+        self.make_label(
+            form,
+            "Apakah ada kerusakan?"
+        )
+
         ttk.Combobox(
-            form, textvariable=self.damage_var, values=("Tidak", "Ya"),
-            state="readonly", width=12
+            form,
+            textvariable=self.damage_var,
+            values=("Tidak", "Ya"),
+            state="readonly",
+            width=12
         ).pack(anchor="w", ipady=4)
 
-        self.make_label(form, "Keterangan kerusakan (isi jika ada)")
-        self.make_entry(form, self.damage_note_var, 60).pack(anchor="w", ipady=7)
-
-        self.make_button(form, "✓  Simpan Pengembalian", self.save_pengembalian).pack(
-            anchor="w", pady=(14, 0)
+        self.make_label(
+            form,
+            "Keterangan kerusakan (isi jika ada)"
         )
 
-        tk.Label(page, text="RIWAYAT PENGEMBALIAN", bg=BG, fg=WHITE,
-                 font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(18, 0))
+        self.make_entry(
+            form,
+            self.damage_note_var,
+            60
+        ).pack(anchor="w", ipady=7)
+
+        self.make_button(
+            form,
+            "✓  Simpan Pengembalian",
+            self.save_pengembalian,
+            color=RETURN_BUTTON
+        ).pack(anchor="w", pady=(14, 0))
+
+        tk.Label(
+            page,
+            text="RIWAYAT PENGEMBALIAN",
+            bg=BG,
+            fg=WHITE,
+            font=("Segoe UI", 12, "bold")
+        ).pack(anchor="w", pady=(18, 0))
+
         self.return_tree = self.make_tree(
-            page, ("waktu", "person", "total", "damage", "note"),
-            ("Waktu Kembali", "Penanggung Jawab", "Total Alat", "Kerusakan", "Keterangan"),
+            page,
+            ("waktu", "person", "total", "damage", "note"),
+            (
+                "Waktu Kembali",
+                "Penanggung Jawab",
+                "Total Alat",
+                "Kerusakan",
+                "Keterangan"
+            ),
             (170, 200, 100, 110, 350)
         )
 
@@ -346,30 +690,52 @@ class BengkelTrackApp:
                 "Pilih peminjaman, isi nama penanggung jawab, dan total alat."
             )
             return
+
         try:
             total = int(total_text)
+
             if total < 0:
                 raise ValueError
+
         except ValueError:
-            messagebox.showwarning("Jumlah tidak valid", "Total alat harus angka 0 atau lebih.")
+            messagebox.showwarning(
+                "Jumlah tidak valid",
+                "Total alat harus angka 0 atau lebih."
+            )
             return
+
         if damage == "Ya" and not note:
-            messagebox.showwarning("Keterangan diperlukan", "Tuliskan keterangan kerusakan alat.")
+            messagebox.showwarning(
+                "Keterangan diperlukan",
+                "Tuliskan keterangan kerusakan alat."
+            )
             return
 
         try:
-            loan_id = int(choice.split(" | ")[0].replace("ID ", ""))
+            loan_id = int(
+                choice.split(" | ")[0].replace("ID ", "")
+            )
+
         except (ValueError, IndexError):
-            messagebox.showerror("Kesalahan", "Pilihan peminjaman tidak terbaca. Pilih ulang.")
+            messagebox.showerror(
+                "Kesalahan",
+                "Pilihan peminjaman tidak terbaca. Pilih ulang."
+            )
             return
 
-        loan = self.db.execute(
-            "SELECT * FROM peminjaman WHERE id = ? AND status = 'Dipinjam'", (loan_id,)
+        loan = self.conn.execute(
+            "SELECT * FROM peminjaman WHERE id = ? AND status = 'Dipinjam'",
+            (loan_id,)
         ).fetchone()
+
         if loan is None:
-            messagebox.showwarning("Transaksi tidak tersedia", "Peminjaman ini sudah dikembalikan.")
+            messagebox.showwarning(
+                "Transaksi tidak tersedia",
+                "Peminjaman ini sudah dikembalikan."
+            )
             self.refresh_all()
             return
+
         if total > loan["total_alat"]:
             messagebox.showwarning(
                 "Jumlah tidak sesuai",
@@ -379,85 +745,264 @@ class BengkelTrackApp:
             return
 
         waktu = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-        with self.db:
-            self.db.execute("""
+
+        with self.conn:
+            self.conn.execute("""
                 INSERT INTO pengembalian
-                (peminjaman_id, penanggung_jawab, total_alat, ada_kerusakan, keterangan, waktu_kembali)
+                (
+                    peminjaman_id,
+                    penanggung_jawab,
+                    total_alat,
+                    ada_kerusakan,
+                    keterangan,
+                    waktu_kembali
+                )
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (loan_id, person, total, damage, note, waktu))
-            self.db.execute(
-                "UPDATE peminjaman SET status = 'Dikembalikan' WHERE id = ?", (loan_id,)
+            """, (
+                loan_id,
+                person,
+                total,
+                damage,
+                note,
+                waktu
+            ))
+
+            self.conn.execute(
+                "UPDATE peminjaman SET status = 'Dikembalikan' WHERE id = ?",
+                (loan_id,)
             )
 
         self.return_person_var.set("")
         self.return_total_var.set("")
         self.damage_var.set("Tidak")
         self.damage_note_var.set("")
-        messagebox.showinfo("Berhasil", "Data pengembalian berhasil disimpan.")
+
+        messagebox.showinfo(
+            "Berhasil",
+            "Data pengembalian berhasil disimpan."
+        )
+
         self.refresh_all()
 
     # Riwayat Peminjaman!
     def build_riwayat(self):
         page = self.pages["Riwayat"]
-        self.page_title(page, "Riwayat Transaksi", "Semua transaksi tersimpan di database lokal.")
+
+        self.page_title(
+            page,
+            "Riwayat Transaksi",
+            "Semua transaksi tersimpan di database lokal."
+        )
+
         actions = tk.Frame(page, bg=BG)
         actions.pack(fill="x")
-        self.make_button(actions, "Ekspor Peminjaman CSV", self.export_peminjaman).pack(
-            side="left", padx=(0, 8)
-        )
-        self.make_button(actions, "Ekspor Pengembalian CSV", self.export_pengembalian,
-                         color=RED_DARK).pack(side="left")
-        tk.Label(page, text="DATA PEMINJAMAN", bg=BG, fg=WHITE,
-                 font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(18, 0))
+
+        self.make_button(
+            actions,
+            "Ekspor Peminjaman CSV",
+            self.export_peminjaman
+        ).pack(side="left", padx=(0, 8))
+
+        self.make_button(
+            actions,
+            "Ekspor Pengembalian CSV",
+            self.export_pengembalian,
+            color=RED_DARK
+        ).pack(side="left", padx=(0, 8))
+
+        self.make_button(
+            actions,
+            "Hapus Data Terpilih",
+            self.delete_selected_transaction,
+            color=RED_DARK
+        ).pack(side="left")
+
+        tk.Label(
+            page,
+            text="DATA PEMINJAMAN",
+            bg=BG,
+            fg=WHITE,
+            font=("Segoe UI", 12, "bold")
+        ).pack(anchor="w", pady=(18, 0))
+
         self.history_loan_tree = self.make_tree(
-            page, ("id", "nama", "kelas", "waktu", "alat", "total", "status"),
-            ("ID", "Nama", "Kelas", "Waktu Pinjam", "Daftar Alat", "Total", "Status"),
+            page,
+            ("id", "nama", "kelas", "waktu", "alat", "total", "status"),
+            (
+                "ID",
+                "Nama",
+                "Kelas",
+                "Waktu Pinjam",
+                "Daftar Alat",
+                "Total",
+                "Status"
+            ),
             (45, 130, 90, 150, 270, 65, 110)
         )
 
-    def export_peminjaman(self):
-        rows = self.db.execute("SELECT * FROM peminjaman ORDER BY id DESC").fetchall()
-        if not rows:
-            messagebox.showinfo("Belum ada data", "Belum ada data peminjaman untuk diekspor.")
+    def delete_selected_transaction(self):
+        selected_items = self.history_loan_tree.selection()
+
+        if not selected_items:
+            messagebox.showwarning(
+                "Peringatan",
+                "Pilih minimal satu data yang ingin dihapus."
+            )
             return
+
+        confirm = messagebox.askyesno(
+            "Konfirmasi Hapus",
+            f"Apakah kamu yakin ingin menghapus {len(selected_items)} data terpilih?"
+        )
+
+        if not confirm:
+            return
+
+        try:
+            with self.conn:
+                for item in selected_items:
+                    values = self.history_loan_tree.item(item, "values")
+                    peminjaman_id = values[0]
+
+                    self.conn.execute(
+                        "DELETE FROM pengembalian WHERE peminjaman_id = ?",
+                        (peminjaman_id,)
+                    )
+
+                    self.conn.execute(
+                        "DELETE FROM peminjaman WHERE id = ?",
+                        (peminjaman_id,)
+                    )
+
+            messagebox.showinfo(
+                "Berhasil",
+                f"{len(selected_items)} data berhasil dihapus."
+            )
+
+            self.refresh_all()
+
+        except sqlite3.Error as e:
+            messagebox.showerror(
+                "Database Error",
+                f"Gagal menghapus data:\n{e}"
+            )
+
+    def export_peminjaman(self):
+        rows = self.conn.execute(
+            "SELECT * FROM peminjaman ORDER BY id DESC"
+        ).fetchall()
+
+        if not rows:
+            messagebox.showinfo(
+                "Belum ada data",
+                "Belum ada data peminjaman untuk diekspor."
+            )
+            return
+
         path = filedialog.asksaveasfilename(
-            defaultextension=".csv", filetypes=[("CSV", "*.csv")],
+            defaultextension=".csv",
+            filetypes=[("CSV", "*.csv")],
             initialfile="laporan_peminjaman.csv"
         )
+
         if not path:
             return
-        with open(path, "w", newline="", encoding="utf-8-sig") as file:
+
+        with open(
+            path,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as file:
             writer = csv.writer(file)
-            writer.writerow(["ID", "Nama", "Kelas", "Waktu Pinjam", "Daftar Alat", "Total Alat", "Status"])
+
+            writer.writerow([
+                "ID",
+                "Nama",
+                "Kelas",
+                "Waktu Pinjam",
+                "Daftar Alat",
+                "Total Alat",
+                "Status"
+            ])
+
             for row in rows:
-                writer.writerow([row["id"], row["nama"], row["kelas"], row["waktu_pinjam"],
-                                 row["daftar_alat"], row["total_alat"], row["status"]])
-        messagebox.showinfo("Ekspor berhasil", f"Laporan disimpan di:\n{path}")
+                writer.writerow([
+                    row["id"],
+                    row["nama"],
+                    row["kelas"],
+                    row["waktu_pinjam"],
+                    row["daftar_alat"],
+                    row["total_alat"],
+                    row["status"]
+                ])
+
+        messagebox.showinfo(
+            "Ekspor berhasil",
+            f"Laporan disimpan di:\n{path}"
+        )
 
     def export_pengembalian(self):
-        rows = self.db.execute("""
-            SELECT p.id, r.penanggung_jawab, r.total_alat, r.ada_kerusakan,
-                   r.keterangan, r.waktu_kembali
-            FROM pengembalian r JOIN peminjaman p ON p.id = r.peminjaman_id
+        rows = self.conn.execute("""
+            SELECT
+                p.id,
+                r.penanggung_jawab,
+                r.total_alat,
+                r.ada_kerusakan,
+                r.keterangan,
+                r.waktu_kembali
+            FROM pengembalian r
+            JOIN peminjaman p ON p.id = r.peminjaman_id
             ORDER BY r.id DESC
         """).fetchall()
+
         if not rows:
-            messagebox.showinfo("Belum ada data", "Belum ada data pengembalian untuk diekspor.")
+            messagebox.showinfo(
+                "Belum ada data",
+                "Belum ada data pengembalian untuk diekspor."
+            )
             return
+
         path = filedialog.asksaveasfilename(
-            defaultextension=".csv", filetypes=[("CSV", "*.csv")],
+            defaultextension=".csv",
+            filetypes=[("CSV", "*.csv")],
             initialfile="laporan_pengembalian.csv"
         )
+
         if not path:
             return
-        with open(path, "w", newline="", encoding="utf-8-sig") as file:
+
+        with open(
+            path,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as file:
             writer = csv.writer(file)
-            writer.writerow(["ID Peminjaman", "Penanggung Jawab", "Total Alat",
-                             "Ada Kerusakan", "Keterangan", "Waktu Kembali"])
+
+            writer.writerow([
+                "ID Peminjaman",
+                "Penanggung Jawab",
+                "Total Alat",
+                "Ada Kerusakan",
+                "Keterangan",
+                "Waktu Kembali"
+            ])
+
             for row in rows:
-                writer.writerow([row["id"], row["penanggung_jawab"], row["total_alat"],
-                                 row["ada_kerusakan"], row["keterangan"], row["waktu_kembali"]])
-        messagebox.showinfo("Ekspor berhasil", f"Laporan disimpan di:\n{path}")
+                writer.writerow([
+                    row["id"],
+                    row["penanggung_jawab"],
+                    row["total_alat"],
+                    row["ada_kerusakan"],
+                    row["keterangan"],
+                    row["waktu_kembali"]
+                ])
+
+        messagebox.showinfo(
+            "Ekspor berhasil",
+            f"Laporan disimpan di:\n{path}"
+        )
 
     # Fungsi Refresh Status Peminjaman!
     def clear_tree(self, tree):
@@ -468,16 +1013,19 @@ class BengkelTrackApp:
         if not hasattr(self, "dashboard_tree"):
             return
 
-        active = self.db.execute(
+        active = self.conn.execute(
             "SELECT COUNT(*) AS n FROM peminjaman WHERE status='Dipinjam'"
         ).fetchone()["n"]
-        returned = self.db.execute(
+
+        returned = self.conn.execute(
             "SELECT COUNT(*) AS n FROM pengembalian"
         ).fetchone()["n"]
-        damaged = self.db.execute(
+
+        damaged = self.conn.execute(
             "SELECT COUNT(*) AS n FROM pengembalian WHERE ada_kerusakan='Ya'"
         ).fetchone()["n"]
-        total = self.db.execute(
+
+        total = self.conn.execute(
             "SELECT COUNT(*) AS n FROM peminjaman"
         ).fetchone()["n"]
 
@@ -486,51 +1034,105 @@ class BengkelTrackApp:
         self.stat_labels["Alat rusak"].configure(text=str(damaged))
         self.stat_labels["Total transaksi"].configure(text=str(total))
 
-        recent = self.db.execute("SELECT * FROM peminjaman ORDER BY id DESC LIMIT 12").fetchall()
-        self.clear_tree(self.dashboard_tree)
-        for row in recent:
-            self.dashboard_tree.insert("", "end", values=(
-                row["id"], row["nama"], row["kelas"], row["waktu_pinjam"],
-                row["daftar_alat"], row["status"]
-            ))
+        # Data peminjaman terbaru
+        recent = self.conn.execute(
+            "SELECT * FROM peminjaman ORDER BY id DESC LIMIT 12"
+        ).fetchall()
 
-        active_rows = self.db.execute(
+        self.clear_tree(self.dashboard_tree)
+
+        for row in recent:
+            self.dashboard_tree.insert(
+                "",
+                "end",
+                values=(
+                    row["id"],
+                    row["nama"],
+                    row["kelas"],
+                    row["waktu_pinjam"],
+                    row["daftar_alat"],
+                    row["status"]
+                )
+            )
+
+        # Data peminjaman aktif
+        active_rows = self.conn.execute(
             "SELECT * FROM peminjaman WHERE status='Dipinjam' ORDER BY id DESC"
         ).fetchall()
+
         self.clear_tree(self.loan_tree)
+
         combo_values = []
+
         for row in active_rows:
-            self.loan_tree.insert("", "end", values=(
-                row["id"], row["nama"], row["kelas"], row["waktu_pinjam"],
-                row["daftar_alat"], row["total_alat"]
-            ))
+            self.loan_tree.insert(
+                "",
+                "end",
+                values=(
+                    row["id"],
+                    row["nama"],
+                    row["kelas"],
+                    row["waktu_pinjam"],
+                    row["daftar_alat"],
+                    row["total_alat"]
+                )
+            )
+
             combo_values.append(
                 f"ID {row['id']} | {row['nama']} | {row['kelas']} | {row['daftar_alat']}"
             )
-        self.loan_combo["values"] = combo_values
-        if self.loan_choice.get() not in combo_values:
-            self.loan_choice.set(combo_values[0] if combo_values else "")
 
-        returned_rows = self.db.execute("""
+        self.loan_combo["values"] = combo_values
+
+        if self.loan_choice.get() not in combo_values:
+            self.loan_choice.set(
+                combo_values[0] if combo_values else ""
+            )
+
+        # Data pengembalian
+        returned_rows = self.conn.execute("""
             SELECT * FROM pengembalian ORDER BY id DESC
         """).fetchall()
-        self.clear_tree(self.return_tree)
-        for row in returned_rows:
-            self.return_tree.insert("", "end", values=(
-                row["waktu_kembali"], row["penanggung_jawab"], row["total_alat"],
-                row["ada_kerusakan"], row["keterangan"] or "-"
-            ))
 
-        all_rows = self.db.execute("SELECT * FROM peminjaman ORDER BY id DESC").fetchall()
+        self.clear_tree(self.return_tree)
+
+        for row in returned_rows:
+            self.return_tree.insert(
+                "",
+                "end",
+                values=(
+                    row["waktu_kembali"],
+                    row["penanggung_jawab"],
+                    row["total_alat"],
+                    row["ada_kerusakan"],
+                    row["keterangan"] or "-"
+                )
+            )
+
+        # Semua riwayat transaksi
+        all_rows = self.conn.execute(
+            "SELECT * FROM peminjaman ORDER BY id DESC"
+        ).fetchall()
+
         self.clear_tree(self.history_loan_tree)
+
         for row in all_rows:
-            self.history_loan_tree.insert("", "end", values=(
-                row["id"], row["nama"], row["kelas"], row["waktu_pinjam"],
-                row["daftar_alat"], row["total_alat"], row["status"]
-            ))
+            self.history_loan_tree.insert(
+                "",
+                "end",
+                values=(
+                    row["id"],
+                    row["nama"],
+                    row["kelas"],
+                    row["waktu_pinjam"],
+                    row["daftar_alat"],
+                    row["total_alat"],
+                    row["status"]
+                )
+            )
 
     def close_app(self):
-        self.db.close()
+        self.conn.close()
         self.root.destroy()
 
 
